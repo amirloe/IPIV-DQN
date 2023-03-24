@@ -20,6 +20,12 @@ import torch
 from processing import process_observation,process_state_batch
 USE_CUDA = torch.cuda.is_available()
 
+"""
+Author: Amir Loewenthal
+This code is used to evaluate the performance of the IPIV-DQN model.
+The experiments in the paper are run using this code.
+"""
+
 class CartpoleIPIVAgentsEval:
     """
     Evaluates and compares the performance of two agents.

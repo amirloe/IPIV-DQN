@@ -11,3 +11,5 @@ This repo contains the following directories:
 
  - `docs` - This folder contains the Thesis work itself and the paper that was written along the thesis.
  - `src` - This folder contains the source code for the thesis work.
+
+The `sbatch_file` is a configuration file for the SLURM scheduler. It is used to run the training code on the BGU cluster.

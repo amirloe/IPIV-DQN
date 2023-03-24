@@ -1,6 +1,11 @@
 import numpy as np
 import tensorflow as tf
 
+"""
+Author: Amir Loewenthal
+
+This File contains the implementation of the loss function for the IPIV-DQN model.
+"""
 
 def v_loss(lambda_in=15., soften=160., alpha=0.05, beta=0., action_size=3):
     """

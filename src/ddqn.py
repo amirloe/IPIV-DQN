@@ -1,6 +1,5 @@
 import sys
 import traceback
-
 import gym
 import pylab
 import os
@@ -14,18 +13,20 @@ from modeleval import CartpoleIPIVAgentsEval
 import pandas as pd
 from processing import process_observation,process_state_batch
 import sys
+
+"""
+Author: Amir Loewenthal
+
+This is the main file for the IPIV-DQN agent. It is used to train the agent and save the model.
+
+"""
+
+# Hyperparameters
 EPISODES = 100000
 STEPS_TOTAL = 1000000
 STACK_SIZE = 4
-# root = 'new_attemptJuly2021/'
 root = './'
-
-
 max_avg_thrs = 200
-# env_name = 'cartpole'
-# env_name = 'lunarlander'
-# env_name = 'Atari'
-#read env name as the first argument
 env_name = sys.argv[1]
 save_path =f'{root}save_model/{env_name}/'
 if not os.path.exists(save_path):
@@ -34,6 +35,19 @@ if not os.path.exists(save_path):
 
 
 def train_agent(agent,env,state_size,action_size,windows,name,isPiven=True,swap=False):
+    """
+    This function is used to train the agent and save the model.
+    # Note: This training function assumes that wandb is used for logging.
+    :param agent: agent to train
+    :param env: environment to train on
+    :param state_size: state size
+    :param action_size: action size
+    :param windows: number of windows to use
+    :param name: name of the agent
+    :param isPiven: boolean to indicate if the agent is Piven or vanilla-DQN
+    :param swap: boolean for experiment with swapping the model weights
+    :return: None, saves the model
+    """
     pi_losses,v_losses,losses,scores, episodes,iters = [], [],[],[],[],[]
     iter=0
     total_steps = 0
@@ -52,14 +66,9 @@ def train_agent(agent,env,state_size,action_size,windows,name,isPiven=True,swap=
                 state = env.reset()
             else:
                 state = np.append(env.reset(),np.zeros(agent.extra_f))
-
-
         else:
             state = env.reset()
-            
-            
-        
-        #TODO CONV adaptation - insert call for process observation
+
         if agent.env_name == 'Atari':
             state = process_observation(state)
             state = np.stack([state] * STACK_SIZE)
@@ -102,6 +111,9 @@ def train_agent(agent,env,state_size,action_size,windows,name,isPiven=True,swap=
             else:
                 next_state = np.reshape(next_state, [-1, agent.state_size])
             # if an action make the episode end, then gives penalty of -100
+            """
+            Note: There is reward modification here. This modification varies from environment to environment.
+            """
             # reward = reward if not done or score == 499 else -100 #Cartpole
             reward = reward  #Lunar lander
             # reward = np.clip(reward, -1., 1.) # Atari
@@ -207,13 +219,15 @@ def train_agent(agent,env,state_size,action_size,windows,name,isPiven=True,swap=
             step_count+=1
             total_steps += 1
             
-            
 
-        # save the model
-#         if e % 50 == 0:
-#             agent.model.save_weights(f"{save_path}cartpole_ddqn_{agent.run_name}_{e}.h5")
 
 def test_agent(agent,env):
+    """
+    Test the agent
+    :param agent: Trained agent
+    :param env: environment
+    :return: None, just print the result
+    """
     done = False
     score = 0
     state = np.append(env.reset(),np.zeros(agent.extra_f))
@@ -274,83 +288,81 @@ def grid_search(model,path1='../experimants/models/picp/no_piven/Piven-Cartpole_
 
 
 if __name__ == "__main__":
+    """
+    This file contains two options for training.
+    1. Train with fixed hyperparameters
+    2. Train with grid search
+    For 1, you can change hyperparameters in the main function.
+    For 2, you can change hyperparameters in the grid_search function.
+    Comment out the function you don't want to use.
+    """
     # In case of CartPole-v1, you can play until 500 time step
     if env_name == 'LunarLander':
         env = gym.make('LunarLander-v2')
     elif env_name == 'MountainCar':
         env = gym.make('MountainCar-v0')
-        
-    # env = gym.make('LunarLander-v2')
-    # get size of state and action from environment
+    elif env_name == 'CartPole':
+        env = gym.make('CartPole-v1')
     state_size = env.observation_space.shape[0]
-    # print(state_size)        
-    # ===== Atari
+
+    # ===== Atari Replace for using Atari
     # env = gym.make('BreakoutDeterministic-v4')
     # INPUT_SHAPE = (84, 84)
     # input_shape = (STACK_SIZE,) + INPUT_SHAPE
     # state_size = input_shape
     # ==== END Atari
+
     action_size = env.action_space.n
     name= "test_sep"
     try:
         os.makedirs(f'{root}save_graph/{name}')
     except:
-        pass    
+        pass
+    #### Fixed hyperparameters
     bias_init=np.append(np.repeat(80.,action_size) ,np.repeat(30.,action_size))
     policy = "point_prediction"
     isPiven=True
     n_windows=0
     windows=[]
-    # beta = 0.9
-    beta = 0.05 # AMIR!! TEST!! CHANGE FOR OUTHER RESULTS!!!
-#     beta = 0
+    beta = 0.05
     alpha = 0.15
     gama=0.99
     # lr = 0.0001 #Cartpole
-    # lr = 0.0001 # LunarLander
     lr = 0.00025 # LunarLander
-    
-    
+    # lr = 0.0001 # MountainCar
+
     seed=1255
 
-    ## NEW METHOD ##
     swap = False
     clip = True
     
     agent = DoubleDQNAgent(state_size, action_size,windows=n_windows,isPiven=isPiven,policy=policy,lr=lr,gama=gama,piven_beta=beta,piven_alpha=alpha,bias_init=bias_init,load_model=False,load_name=name,seed=seed,swap=swap,clip = clip,env_name=env_name,pretrained=False)
     Path(f"{save_path}{agent.run_name}/episodes").mkdir(parents=True, exist_ok=True)
     train_agent(agent,env,state_size,action_size,windows=windows,name=name,isPiven=isPiven,swap=swap)
-    ################
-    for lr in [0.0001,0.001]:
-        for gama in [0.99,0.9,0.95]: 
-            for alpha in [0.15,0.05,0.25]:
-                for beta in [0.9,0.1,0.5]:
-    # for bias_init in [np.append(np.repeat(40.,2) ,np.repeat(0.,2)),np.append(np.repeat(20.,2) ,np.repeat(-20.,2)),np.append(np.repeat(10.,2) ,np.repeat(0.,2))]:
-    # while True:
-                                            try:
-                                                print("\n" * 5)
-                                                print("=" * 10, "lr", lr, "gama", gama, "alpha", alpha, "beta", beta, "=" * 10)
-                                                env.seed(seed)
-                                                agent = DoubleDQNAgent(state_size, action_size,windows=n_windows,isPiven=isPiven,policy=policy,lr=lr,gama=gama,piven_beta=beta,piven_alpha=alpha,bias_init=bias_init,load_model=False,load_name=name,seed=seed,swap=swap,clip = clip,env_name=env_name,pretrained=False)
-                                                Path(f"{save_path}{agent.run_name}/episodes").mkdir(parents=True, exist_ok=True)
-                                                train_agent(agent,env,state_size,action_size,windows=windows,name=name,isPiven=isPiven,swap=swap)
-                                                K.clear_session()
-                                                agent.run.finish()
-                                                seed = seed+1
-                                            except Exception as e:
-                                                print(("=" * 10) + "Error: " + str(e)+("=" * 10))
-                                                traceback.print_exc()
-                                                print(e)
-                                                print(f"Failed Seed {seed}")
-                                                K.clear_session()
-                                                agent.run.finish()
-                                                seed = seed+1
-                                                continue
-    # # # for x in range(50,950,50):
-    # x = 900
-    # print(f'============================================ X = {x} ======================================================')
-    # agent = DoubleDQNAgent(state_size, action_size,windows=n_windows,isPiven=True,policy=policy,lr=lr,piven_beta=beta,bias_init=bias_init,load_model=True,load_name=name,load_episode=100)
-    # test_agent(agent=agent,env=env)
-    # print(f'============================================ ======= ======================================================')
 
-    
+    ################ Grid search for parameter tuning ################
+    # for lr in [0.0001,0.001]:
+    #     for gama in [0.99,0.9,0.95]:
+    #         for alpha in [0.15,0.05,0.25]:
+    #             for beta in [0.9,0.1,0.5]:
+    # # for bias_init in [np.append(np.repeat(40.,2) ,np.repeat(0.,2)),np.append(np.repeat(20.,2) ,np.repeat(-20.,2)),np.append(np.repeat(10.,2) ,np.repeat(0.,2))]:
+    # # while True:
+    #                                         try:
+    #                                             print("\n" * 5)
+    #                                             print("=" * 10, "lr", lr, "gama", gama, "alpha", alpha, "beta", beta, "=" * 10)
+    #                                             env.seed(seed)
+    #                                             agent = DoubleDQNAgent(state_size, action_size,windows=n_windows,isPiven=isPiven,policy=policy,lr=lr,gama=gama,piven_beta=beta,piven_alpha=alpha,bias_init=bias_init,load_model=False,load_name=name,seed=seed,swap=swap,clip = clip,env_name=env_name,pretrained=False)
+    #                                             Path(f"{save_path}{agent.run_name}/episodes").mkdir(parents=True, exist_ok=True)
+    #                                             train_agent(agent,env,state_size,action_size,windows=windows,name=name,isPiven=isPiven,swap=swap)
+    #                                             K.clear_session()
+    #                                             agent.run.finish()
+    #                                             seed = seed+1
+    #                                         except Exception as e:
+    #                                             print(("=" * 10) + "Error: " + str(e)+("=" * 10))
+    #                                             traceback.print_exc()
+    #                                             print(e)
+    #                                             print(f"Failed Seed {seed}")
+    #                                             K.clear_session()
+    #                                             agent.run.finish()
+    #                                             seed = seed+1
+    #                                             continue

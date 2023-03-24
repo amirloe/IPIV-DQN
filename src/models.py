@@ -17,8 +17,23 @@ import wandb
 from wandb.keras import WandbCallback
 from processing import process_observation,process_state_batch
 import pdb
-# Loss functions
-# piven loss definition
+
+"""
+Author: Amir Loewenthal
+
+This file contains the model definitions for the DQN and PIVEN DQN models.
+This file also contains the loss functions for the PIVEN DQN model.
+Its main purpose is to be imported by the ddqn.py file.
+
+"""
+
+
+"""
+This section contains the IPIV DQN loss functions.
+As presented in the paper, the IPIV DQN loss function is a combination of  the PI loss function and the V loss function.
+The PI loss function is a combination of the MPIW_capt and the PICP_soft.
+The V loss function is the MSE between the predicted value and the true value. As used in DQN.
+"""
 def loss_normalize(loss):
     
     loss_value = tf.Variable(1.0)
@@ -30,7 +45,6 @@ def loss_normalize(loss):
 
 def piven_dqn_loss_normal(lambda_in=15., soften=160., alpha=0.05, beta=0.5 ,action_size=3):
     """
-
     :param lambda_in: lambda parameter
     :param soften: soften parameter
     :param alpha: confidence level (1-alpha)
@@ -278,6 +292,7 @@ def piven_dqn_loss(lambda_in=15., soften=160., alpha=0.05, beta=0.5 ,action_size
         return loss_final
 
     return piven_loss
+
 """
     Double DQN Agent for the Cartpole
     it uses Neural Network to approximate q function
@@ -285,6 +300,28 @@ def piven_dqn_loss(lambda_in=15., soften=160., alpha=0.05, beta=0.5 ,action_size
 """
 class DoubleDQNAgent:
     def __init__(self, state_size, action_size,windows,isPiven,policy="point_prediction",lr = 0.0001,gama=0.99,piven_beta=0.5,piven_alpha=0.25,bias_init=np.append(np.repeat(2.,2) ,np.repeat(-2.,2)),load_model=False,load_name=None,load_path='',load_episode=-1,seed=2,swap=False,clip = False,test=False,largev=False,env_name='cartpole',pretrained=False):
+        """
+        Agent for the IPIV-RL
+        :param state_size: state size
+        :param action_size: action size
+        :param windows:
+        :param isPiven: boolean for ipiv
+        :param policy: policy for the agent
+        :param lr: learning rate
+        :param gama: gama hyperparameter of DQN
+        :param piven_beta: IPIV alpha
+        :param piven_alpha: IPIV beta
+        :param bias_init: inital bias for the networks PIs
+        :param load_model: boolean for loading model
+        :param load_name: model name
+        :param load_path: path to the model
+        :param load_episode: episode number
+        :param seed: seed for the random
+        :param swap: boolean for swap
+        :param clip: boolean for gradient clipping
+        :param env_name: environment name
+        :param pretrained: boolean for pretrained model
+        """
         if not test:
         # WandB init
         #     self.run = wandb.init(project='test-proj',reinit=True) #CartpolePtoject
@@ -292,6 +329,7 @@ class DoubleDQNAgent:
             self.run = wandb.init(project='Fixes',reinit=True) #AtariBreakout Project
             self.run_name = wandb.run.name
             # wandb.run.save()
+            #Logging to wandb
             self.config = wandb.config
             self.config.envName = env_name
             self.config.is_piven = isPiven
@@ -462,21 +500,13 @@ class DoubleDQNAgent:
         X = Dense(32, activation="relu", kernel_initializer=he_uniform(seed=self.seed), name='h5')(X)
         if b_norm:
             X = BatchNormalization(name='Bnorm5')(X)
-        # X = Dense(32, activation="relu", kernel_initializer=he_uniform(seed=self.seed), name='h4')(X)
-        # if b_norm:
-        
-        #     X = BatchNormalization()(X)
-        # X = Dense(16, activation="relu", kernel_initializer=he_uniform(seed=self.seed), name='h5')(X)
-        # if b_norm:
-        #     X = BatchNormalization()(X)
+
 
         pi = Dense(2*self.action_size, activation='linear',kernel_initializer=RandomNormal(mean=0.0, stddev=0.2,seed=self.seed),
                                         bias_initializer=Constant(value=bias_init), name='pi')(X)# pi initialization using bias
         activation = "linear" if self.largev else "sigmoid"
         q = Dense(self.action_size, activation=activation, kernel_initializer=he_uniform(seed=self.seed), name='q')(X)
-        # pi = Dense(2*self.action_size, activation='linear',kernel_initializer=tf.keras.initializers.Zeros(),
-        #                                 bias_initializer=Constant(value=bias_init), name='pi')(X) # pi initialization using bias
-        # q = Dense(self.action_size, activation="sigmoid", kernel_initializer='he_uniform', name='q')(X)
+
         piven_out = Concatenate(name='piven_out')([pi, q])
         model = Model(inputs=inputs, outputs=[piven_out], name='piven_model')
         # compile
@@ -485,7 +515,6 @@ class DoubleDQNAgent:
         else:
             opt = tf.keras.optimizers.Adam(lr=self.learning_rate,clipvalue=.6,clipnorm=1.)
         lossf = piven_dqn_loss(beta=self.piven_beta,lambda_in=15.0,alpha=self.piven_alpha,action_size=self.action_size)
-        # lossf = piven_dqn_loss_normal(beta=self.piven_beta,lambda_in=15.0,alpha=.25,action_size=self.action_size)
         pi_lossf = pi_loss(beta=1.,lambda_in=15.0,alpha=.25,action_size=self.action_size)
         v_lossf = v_loss(beta=0.,lambda_in=15.0,alpha=.25,action_size=self.action_size)
         model.compile(loss=lossf,metrics=[pi_lossf,v_lossf],optimizer=opt)
@@ -558,9 +587,7 @@ class DoubleDQNAgent:
         return ans
 
     def _choose_action(self,predict,q_val,alpha=0.9):
-        
-        
-        
+
         if  self.policy == 'point_prediction':
             return np.argmax(q_val)
         
@@ -692,17 +719,8 @@ class DoubleDQNAgent:
                 target[i][action[i]] = reward[i] + self.discount_factor * (
                     target_val[i][a])
 
-        # make minibatch which includes target q value and predicted q value
-        # and do the model fit!
-        # print("===============PRINT TEST TRAIN================")
-        # print(f"BEFORE\n\n{target_lb}\n")
-        # print(f"AFTER\n\n{target}\n============================================")
+
         loss = self.model.fit(update_input, target, batch_size=self.batch_size,
                        epochs=1, verbose=0,callbacks=[WandbCallback()])
-        # if loss.history['v_loss'][0] > 400:
-        #     pdb.set_trace()
-        #     pre = self.predict_to_q(pred)
-        #     for x in range(batch_size):
-    
-        #         print(pre[x],target_lb[x],target[x])
+
         return loss
